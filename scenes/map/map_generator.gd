@@ -15,6 +15,10 @@ const CAMPFIRE_ROOM_WEIGHT := 4.0
 @export var battle_stats_pool: BattleStatsPool
 @export var event_room_pool: EventRoomPool
 
+@export var map_level := 1
+var total_floors = int(ceil(FLOORS * (1 + 0.25 * map_level)))
+
+
 var random_room_type_weights = {
 	Room.Type.MONSTER: 0.0,
 	Room.Type.CAMPFIRE: 0.0,
@@ -31,7 +35,7 @@ func generate_map() -> Array[Array]:
 	
 	for j in starting_points:
 		var current_j := j
-		for i in FLOORS - 1:
+		for i in total_floors - 1:
 			current_j = _setup_connection(i, current_j)
 			
 	battle_stats_pool.setup()
@@ -46,7 +50,7 @@ func generate_map() -> Array[Array]:
 func _generate_initial_grid() -> Array[Array]:
 	var result: Array[Array] = []
 	
-	for i in FLOORS:
+	for i in total_floors:
 		var adjacent_rooms: Array[Room]= []
 		
 		for j in MAP_WIDTH:
@@ -58,7 +62,7 @@ func _generate_initial_grid() -> Array[Array]:
 			current_room.next_rooms = []
 			
 			# Boss room has a non-random Y
-			if i == FLOORS - 1:
+			if i == total_floors - 1:
 				current_room.position.y = (i + 1) * -Y_DIST
 			
 			adjacent_rooms.append(current_room)
@@ -127,10 +131,10 @@ func _would_cross_existing_path(i: int, j: int, room: Room) -> bool:
 
 func _setup_boss_room() -> void:
 	var middle := floori(MAP_WIDTH * 0.5)
-	var boss_room := map_data[FLOORS - 1][middle] as Room
+	var boss_room := map_data[total_floors - 1][middle] as Room
 	
 	for j in MAP_WIDTH:
-		var current_room = map_data[FLOORS - 2][j] as Room
+		var current_room = map_data[total_floors - 2][j] as Room
 		if current_room.next_rooms:
 			current_room.next_rooms = [] as Array[Room]
 			current_room.next_rooms.append(boss_room)
@@ -155,16 +159,24 @@ func _setup_room_types() -> void:
 				room.type = Room.Type.MONSTER
 				room.battle_stats = battle_stats_pool.get_random_battle_for_tier(0)
 
-	# 9th floor is always a treasure
-	for room: Room in map_data[8]:
-		if room.next_rooms.size() > 0:
-				room.type = Room.Type.TREASURE
-				
-	# last floor before the boss is always a campfire
-	for room: Room in map_data[13]:
-		if room.next_rooms.size() > 0:
-				room.type = Room.Type.CAMPFIRE
-	
+	for i in map_data.size():
+		var is_ninth_room := ((i + 1) % 9) == 0
+		var is_last := i == map_data.size() - 1
+		var is_second_last := i == map_data.size() - 2
+		
+		# every 9th floor is always a treasure
+		if is_ninth_room and !is_last and !is_second_last:
+			for room: Room in map_data[i]:
+				if room.next_rooms.size() > 0:
+						room.type = Room.Type.TREASURE
+					
+					
+		# last floor before the boss is always a campfire
+		if is_second_last:
+			for room: Room in map_data[i]:
+				if room.next_rooms.size() > 0:
+						room.type = Room.Type.CAMPFIRE
+		
 	# rest of rooms
 	for current_floor in map_data:
 		for room: Room in current_floor:
